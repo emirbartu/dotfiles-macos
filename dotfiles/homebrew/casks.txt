@@ -1,5 +1,6 @@
 aerospace
 discord
+docker
 docker-desktop
 font-hack-nerd-font
 font-sf-mono
@@ -13,4 +14,6 @@ raycast
 sf-symbols
 telegram
 unnaturalscrollwheels
+visual-studio-code
+vlc
 visual-studio-code
