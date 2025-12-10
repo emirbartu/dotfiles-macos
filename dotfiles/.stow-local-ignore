@@ -1,0 +1,24 @@
+# Assets
+assets
+
+# git files
+\.gitconfig.template
+\.gitignore
+\.git
+\.gitmodules
+
+# Macos
+\.DS_Store
+
+# VSCode
+\.vscode
+
+# Project
+^/README.*
+
+# Stow
+.stowrc
+
+# Homebrew
+homebrew
+

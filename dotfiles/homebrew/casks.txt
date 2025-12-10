@@ -1,0 +1,16 @@
+aerospace
+discord
+docker-desktop
+font-hack-nerd-font
+font-sf-mono
+font-sf-pro
+font-fira-code-nerd-font
+hiddenbar
+kitty
+notion
+postman
+raycast
+sf-symbols
+telegram
+unnaturalscrollwheels
+visual-studio-code
