@@ -7,7 +7,15 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# --------------------------------------------------------------
+# Header
+# --------------------------------------------------------------
+
 echo -e "${BLUE}:: macOS Kurulum Scripti Başlatılıyor...${NC}"
+
+# --------------------------------------------------------------
+# Install Homebrew
+# --------------------------------------------------------------
 
 if ! command -v brew &> /dev/null; then
     echo -e "${YELLOW}:: Homebrew bulunamadı. Kuruluyor...${NC}"
@@ -20,8 +28,16 @@ else
     echo -e "${GREEN}:: Homebrew zaten yüklü.${NC}"
 fi
 
+# --------------------------------------------------------------
+# Update Homebrew
+# --------------------------------------------------------------
+
 echo -e "${BLUE}:: Homebrew güncelleniyor...${NC}"
 brew update
+
+# --------------------------------------------------------------
+# Install GNU Stow
+# --------------------------------------------------------------
 
 echo -e "${BLUE}:: GNU Stow kuruluyor...${NC}"
 if brew list --formula | grep -q "^stow$"; then
@@ -31,18 +47,9 @@ else
     brew install stow
 fi
 
-echo -e "${BLUE}:: Oh My Zsh kuruluyor...${NC}"
-if [ -d "$HOME/.oh-my-zsh" ]; then
-    echo -e "${GREEN}:: Oh My Zsh zaten yüklü.${NC}"
-else
-    echo -e "${YELLOW}:: Oh My Zsh kuruluyor...${NC}"
-    sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}:: Oh My Zsh başarıyla kuruldu.${NC}"
-    else
-        echo -e "${RED}:: Oh My Zsh kurulumu başarısız.${NC}"
-    fi
-fi
+# --------------------------------------------------------------
+# Install CLI Tools
+# --------------------------------------------------------------
 
 # Read formulae from file
 formulae_file="$SCRIPT_DIR/../macos/dotfiles/homebrew/formulae.txt"
@@ -69,6 +76,10 @@ else
     echo -e "${YELLOW}:: Formula dosyası bulunamadı: $formulae_file${NC}"
 fi
 
+# --------------------------------------------------------------
+# Install GUI Applications
+# --------------------------------------------------------------
+
 echo -e "${BLUE}:: GUI Uygulamaları (Cask) Kuruluyor...${NC}"
 if [ -f "$casks_file" ]; then
     while IFS= read -r cask; do
@@ -90,37 +101,97 @@ else
     echo -e "${YELLOW}:: Cask dosyası bulunamadı: $casks_file${NC}"
 fi
 
-DOTFILES_DIR="$SCRIPT_DIR/../macos/dotfiles"
+# --------------------------------------------------------------
+# Install dotfiles using GNU Stow
+# --------------------------------------------------------------
 
-echo -e "${BLUE}:: GNU Stow ile dotfiles kuruluyor...${NC}"
+echo ":: Installing dotfiles with GNU Stow..."
 
-if [ -d "$DOTFILES_DIR" ]; then
-    cd "$DOTFILES_DIR"
-    echo -e "${BLUE}:: Dotfiles kuruluyor: $DOTFILES_DIR${NC}"
+SOURCE_DOTFILES_DIR="$SCRIPT_DIR/../dotfiles"
+DEST_DOTFILES_DIR="$HOME/.dotfiles"
+
+# Backup existing dotfiles directory if it exists
+if [ -d "$DEST_DOTFILES_DIR" ]; then
+    echo ":: Backing up existing .dotfiles directory..."
+    mv "$DEST_DOTFILES_DIR" "$DEST_DOTFILES_DIR.bak.$(date +%Y%m%d-%H%M%S)"
+fi
+
+# Copy dotfiles to home directory
+echo ":: Copying dotfiles to $DEST_DOTFILES_DIR..."
+cp -r "$SOURCE_DOTFILES_DIR" "$DEST_DOTFILES_DIR"
+
+# Install dotfiles
+if [ -d "$DEST_DOTFILES_DIR" ]; then
+    cd "$DEST_DOTFILES_DIR"
+    echo ":: Installing dotfiles from $DEST_DOTFILES_DIR"
     
-    # Install each directory in macos/dotfiles
+    # Stow each package
     for dir in */; do
-        if [ -d "$dir" ]; then
-            echo -e "${YELLOW}:: $dir kuruluyor...${NC}"
-            stow -t ~ "$dir"
+        dir_name="${dir%/}"
+        if [ -d "$dir_name" ]; then
+            echo ":: Stowing $dir_name"
+            stow -D "$dir_name" 2>/dev/null  # Unstow first
+            stow -v "$dir_name"              # Stow to ~/.config
             if [ $? -eq 0 ]; then
-                echo -e "${GREEN}:: $dir başarıyla kuruldu.${NC}"
+                echo ":: Successfully installed $dir_name"
             else
-                echo -e "${RED}:: $dir kurulumu başarısız.${NC}"
+                echo ":: Failed to install $dir_name"
             fi
         fi
     done
-    echo -e "${GREEN}:: Dotfiles kurulumu tamamlandı.${NC}"
-else
-    echo -e "${YELLOW}:: macos/dotfiles klasörü bulunamadı: $DOTFILES_DIR${NC}"
 fi
+
+# --------------------------------------------------------------
+# Oh My Zsh & Plugins
+# --------------------------------------------------------------
+
+echo ":: Installing Oh My Zsh..."
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+else
+    echo ":: Oh My Zsh already installed"
+fi
+
+echo ":: Installing Oh My Zsh plugins..."
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+# zsh-autosuggestions
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
+    git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+fi
+
+# zsh-syntax-highlighting
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+fi
+
+# fast-syntax-highlighting
+if [ ! -d "$ZSH_CUSTOM/plugins/fast-syntax-highlighting" ]; then
+    git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
+fi
+
+# --------------------------------------------------------------
+# Oh My Posh
+# --------------------------------------------------------------
+echo ":: Installing Oh My Posh..."
+curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
+
+# --------------------------------------------------------------
+# UV
+# --------------------------------------------------------------
+
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# --------------------------------------------------------------
+# Install Sketchybar
+# --------------------------------------------------------------
 
 echo -e "${BLUE}:: Sketchybar kuruluyor...${NC}"
 if brew list --formula | grep -q "^sketchybar$"; then
     echo -e "${GREEN}:: Sketchybar zaten yüklü.${NC}"
 else
     echo -e "${YELLOW}:: Sketchybar bağımlılıkları kuruluyor...${NC}"
-    
+
     # Install sketchybar dependencies
     sketchybar_deps=("lua" "switchaudio-osx" "nowplaying-cli")
     for dep in "${sketchybar_deps[@]}"; do
@@ -136,11 +207,11 @@ else
             fi
         fi
     done
-    
+
     # Add custom tap for sketchybar
     echo -e "${BLUE}:: FelixKratz/formulae tap ekleniyor...${NC}"
     brew tap FelixKratz/formulae
-    
+
     # Install sketchybar
     echo -e "${YELLOW}:: Sketchybar kuruluyor...${NC}"
     brew install sketchybar
@@ -149,7 +220,7 @@ else
     else
         echo -e "${RED}:: Sketchybar kurulumu başarısız.${NC}"
     fi
-    
+
     # Install fonts
     echo -e "${BLUE}:: Sketchybar fontları kuruluyor...${NC}"
     font_casks=("sf-symbols" "font-sf-mono" "font-sf-pro")
@@ -166,7 +237,7 @@ else
             fi
         fi
     done
-    
+
     # Download sketchybar-app-font
     echo -e "${BLUE}:: sketchybar-app-font.ttf indiriliyor...${NC}"
     if [ ! -f "$HOME/Library/Fonts/sketchybar-app-font.ttf" ]; then
@@ -179,7 +250,7 @@ else
     else
         echo -e "${GREEN}:: sketchybar-app-font.ttf zaten yüklü.${NC}"
     fi
-    
+
     # Install SbarLua
     echo -e "${BLUE}:: SbarLua kuruluyor...${NC}"
     if [ ! -d "/usr/local/share/lua/5.4/sketchybar" ]; then
@@ -198,6 +269,10 @@ else
     fi
 fi
 
+# --------------------------------------------------------------
+# Build Sketchybar Helpers
+# --------------------------------------------------------------
+
 # Build sketchybar helper binaries if configuration exists
 SKETCHYBAR_CONFIG_DIR="$HOME/.config/sketchybar"
 if [ -d "$SKETCHYBAR_CONFIG_DIR" ]; then
@@ -209,7 +284,7 @@ if [ -d "$SKETCHYBAR_CONFIG_DIR" ]; then
     else
         echo -e "${RED}:: Sketchybar helper binary'leri derlenemedi.${NC}"
     fi
-    
+
     # Start sketchybar service
     echo -e "${BLUE}:: Sketchybar servisi başlatılıyor...${NC}"
     brew services start sketchybar
@@ -221,6 +296,19 @@ if [ -d "$SKETCHYBAR_CONFIG_DIR" ]; then
 else
     echo -e "${YELLOW}:: Sketchybar konfigürasyonu bulunamadı, helper binary'leri derlenemedi.${NC}"
 fi
+
+
+git config --global user.name "emirbartu"
+git config --global user.email "bartuekinci42@gmail.com"
+
+if [ -f "$DEST_DOTFILES_DIR/zshrc/.zshrc" ]; then
+    echo ":: Installing custom .zshrc..."
+    cp -f "$DEST_DOTFILES_DIR/zshrc/.zshrc" "$HOME/.zshrc"
+fi
+
+# --------------------------------------------------------------
+# Finish
+# --------------------------------------------------------------
 
 echo -e "${GREEN}--------------------------------------------------------------${NC}"
 echo -e "${GREEN}:: Kurulum Tamamlandı!${NC}"
