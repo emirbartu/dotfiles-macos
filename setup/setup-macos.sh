@@ -3,6 +3,7 @@
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -100,46 +101,44 @@ if [ -f "$casks_file" ]; then
 else
     echo -e "${YELLOW}:: Cask dosyası bulunamadı: $casks_file${NC}"
 fi
-
 # --------------------------------------------------------------
 # Install dotfiles using GNU Stow
 # --------------------------------------------------------------
 
-echo ":: Installing dotfiles with GNU Stow..."
+echo -e "${BLUE}:: Dotfiles kurulumu başlatılıyor...${NC}"
 
 SOURCE_DOTFILES_DIR="$SCRIPT_DIR/../dotfiles"
 DEST_DOTFILES_DIR="$HOME/.dotfiles"
 
-# Backup existing dotfiles directory if it exists
+# 1. Eski yedekleri temizle ve mevcut klasörü yedekle
 if [ -d "$DEST_DOTFILES_DIR" ]; then
-    echo ":: Backing up existing .dotfiles directory..."
+    echo -e "${YELLOW}:: Mevcut .dotfiles klasörü yedekleniyor...${NC}"
     mv "$DEST_DOTFILES_DIR" "$DEST_DOTFILES_DIR.bak.$(date +%Y%m%d-%H%M%S)"
 fi
 
-# Copy dotfiles to home directory
-echo ":: Copying dotfiles to $DEST_DOTFILES_DIR..."
+# 2. Güncel dotfiles'ı home dizinine kopyala
+echo -e "${BLUE}:: Dotfiles $DEST_DOTFILES_DIR adresine kopyalanıyor...${NC}"
 cp -r "$SOURCE_DOTFILES_DIR" "$DEST_DOTFILES_DIR"
 
-# Install dotfiles
-if [ -d "$DEST_DOTFILES_DIR" ]; then
-    cd "$DEST_DOTFILES_DIR"
-    echo ":: Installing dotfiles from $DEST_DOTFILES_DIR"
-    
-    # Stow each package
-    for dir in */; do
-        dir_name="${dir%/}"
-        if [ -d "$dir_name" ]; then
-            echo ":: Stowing $dir_name"
-            stow -D "$dir_name" 2>/dev/null  # Unstow first
-            stow -v "$dir_name"              # Stow to ~/.config
-            if [ $? -eq 0 ]; then
-                echo ":: Successfully installed $dir_name"
-            else
-                echo ":: Failed to install $dir_name"
-            fi
-        fi
-    done
+# 3. Stow işlemleri için hedef klasöre gir
+cd "$DEST_DOTFILES_DIR"
+
+# 4. .config altındaki klasörleri linkle
+# Bu işlem ~/.config/kitty gibi klasör yapısını korur.
+if [ -d ".config" ]; then
+    echo -e "${BLUE}:: .config içerisindeki uygulamalar linkleniyor...${NC}"
+    # --target=$HOME diyerek ana dizini hedefliyoruz, 
+    # Stow içindeki .config klasörünü görünce otomatik olarak ~/.config ile eşleştirir.
+    stow -v -R -t "$HOME" .config
 fi
+
+# 5. Ana dizindeki (root) dosyaları linkle (.zshrc, .tmux.conf vb.)
+echo -e "${BLUE}:: Root seviyesindeki dosyalar linkleniyor (.zshrc, .tmux.conf)...${NC}"
+# Bu komut .dotfiles/ içindeki .zshrc gibi dosyaları ~/ .zshrc olarak linkler.
+# --ignore ile .config klasörünü ve diğer gereksizleri atlıyoruz ki tekrar uğraşmasın.
+stow -v -R -t "$HOME" --ignore=".config" --ignore="homebrew" --ignore="assets" .
+
+echo -e "${GREEN}:: Dotfiles kurulumu başarıyla tamamlandı.${NC}"
 
 # --------------------------------------------------------------
 # Oh My Zsh & Plugins
@@ -158,6 +157,11 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 # zsh-autosuggestions
 if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
     git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+fi
+
+# zsh-autocomplete
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autocomplete" ]; then
+    git clone https://github.com/marlonrichert/zsh-autocomplete "$ZSH_CUSTOM/plugins/zsh-autocomplete"
 fi
 
 # zsh-syntax-highlighting
@@ -187,32 +191,32 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # --------------------------------------------------------------
 
 echo -e "${BLUE}:: Sketchybar kuruluyor...${NC}"
+
+# Add custom tap for sketchybar
+echo -e "${BLUE}:: FelixKratz/formulae tap ekleniyor...${NC}"
+brew tap FelixKratz/formulae
+
+# Install sketchybar dependencies
+echo -e "${YELLOW}:: Sketchybar bağımlılıkları kuruluyor...${NC}"
+sketchybar_deps=("lua" "switchaudio-osx" "nowplaying-cli" "jq" "gh")
+for dep in "${sketchybar_deps[@]}"; do
+    if brew list --formula | grep -q "^${dep}$"; then
+        echo -e "${GREEN}:: $dep zaten yüklü.${NC}"
+    else
+        echo -e "${YELLOW}:: $dep kuruluyor...${NC}"
+        brew install "$dep"
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}:: $dep başarıyla kuruldu.${NC}"
+        else
+            echo -e "${RED}:: $dep kurulumu başarısız.${NC}"
+        fi
+    fi
+done
+
+# Install sketchybar
 if brew list --formula | grep -q "^sketchybar$"; then
     echo -e "${GREEN}:: Sketchybar zaten yüklü.${NC}"
 else
-    echo -e "${YELLOW}:: Sketchybar bağımlılıkları kuruluyor...${NC}"
-
-    # Install sketchybar dependencies
-    sketchybar_deps=("lua" "switchaudio-osx" "nowplaying-cli")
-    for dep in "${sketchybar_deps[@]}"; do
-        if brew list --formula | grep -q "^${dep}$"; then
-            echo -e "${GREEN}:: $dep zaten yüklü.${NC}"
-        else
-            echo -e "${YELLOW}:: $dep kuruluyor...${NC}"
-            brew install "$dep"
-            if [ $? -eq 0 ]; then
-                echo -e "${GREEN}:: $dep başarıyla kuruldu.${NC}"
-            else
-                echo -e "${RED}:: $dep kurulumu başarısız.${NC}"
-            fi
-        fi
-    done
-
-    # Add custom tap for sketchybar
-    echo -e "${BLUE}:: FelixKratz/formulae tap ekleniyor...${NC}"
-    brew tap FelixKratz/formulae
-
-    # Install sketchybar
     echo -e "${YELLOW}:: Sketchybar kuruluyor...${NC}"
     brew install sketchybar
     if [ $? -eq 0 ]; then
@@ -220,53 +224,81 @@ else
     else
         echo -e "${RED}:: Sketchybar kurulumu başarısız.${NC}"
     fi
+fi
 
-    # Install fonts
-    echo -e "${BLUE}:: Sketchybar fontları kuruluyor...${NC}"
-    font_casks=("sf-symbols" "font-sf-mono" "font-sf-pro")
-    for font in "${font_casks[@]}"; do
-        if brew list --cask | grep -q "^${font}$"; then
-            echo -e "${GREEN}:: $font zaten yüklü.${NC}"
-        else
-            echo -e "${YELLOW}:: $font kuruluyor...${NC}"
-            brew install --cask "$font"
-            if [ $? -eq 0 ]; then
-                echo -e "${GREEN}:: $font başarıyla kuruldu.${NC}"
-            else
-                echo -e "${RED}:: $font kurulumu başarısız.${NC}"
-            fi
-        fi
-    done
-
-    # Download sketchybar-app-font
-    echo -e "${BLUE}:: sketchybar-app-font.ttf indiriliyor...${NC}"
-    if [ ! -f "$HOME/Library/Fonts/sketchybar-app-font.ttf" ]; then
-        curl -L https://github.com/kvndrsslr/sketchybar-app-font/releases/download/v2.0.5/sketchybar-app-font.ttf -o "$HOME/Library/Fonts/sketchybar-app-font.ttf"
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}:: sketchybar-app-font.ttf başarıyla indirildi.${NC}"
-        else
-            echo -e "${RED}:: sketchybar-app-font.ttf indirilemedi.${NC}"
-        fi
+# Install fonts
+echo -e "${BLUE}:: Sketchybar fontları kuruluyor...${NC}"
+font_casks=("sf-symbols" "font-sf-mono" "font-sf-pro")
+for font in "${font_casks[@]}"; do
+    if brew list --cask | grep -q "^${font}$"; then
+        echo -e "${GREEN}:: $font zaten yüklü.${NC}"
     else
-        echo -e "${GREEN}:: sketchybar-app-font.ttf zaten yüklü.${NC}"
-    fi
-
-    # Install SbarLua
-    echo -e "${BLUE}:: SbarLua kuruluyor...${NC}"
-    if [ ! -d "/usr/local/share/lua/5.4/sketchybar" ]; then
-        git clone https://github.com/FelixKratz/SbarLua.git /tmp/SbarLua
-        cd /tmp/SbarLua
-        make install
+        echo -e "${YELLOW}:: $font kuruluyor...${NC}"
+        brew install --cask "$font"
         if [ $? -eq 0 ]; then
-            echo -e "${GREEN}:: SbarLua başarıyla kuruldu.${NC}"
+            echo -e "${GREEN}:: $font başarıyla kuruldu.${NC}"
         else
-            echo -e "${RED}:: SbarLua kurulumu başarısız.${NC}"
+            echo -e "${RED}:: $font kurulumu başarısız.${NC}"
+        fi
+    fi
+done
+
+# Download sketchybar-app-font
+echo -e "${BLUE}:: sketchybar-app-font.ttf indiriliyor...${NC}"
+if [ ! -d "$HOME/Library/Fonts" ]; then
+    mkdir -p "$HOME/Library/Fonts"
+fi
+
+if [ ! -f "$HOME/Library/Fonts/sketchybar-app-font.ttf" ]; then
+    curl -L https://github.com/kvndrsslr/sketchybar-app-font/releases/download/v2.0.5/sketchybar-app-font.ttf -o "$HOME/Library/Fonts/sketchybar-app-font.ttf"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}:: sketchybar-app-font.ttf başarıyla indirildi.${NC}"
+    else
+        echo -e "${RED}:: sketchybar-app-font.ttf indirilemedi.${NC}"
+    fi
+else
+    echo -e "${GREEN}:: sketchybar-app-font.ttf zaten yüklü.${NC}"
+fi
+
+# Install sketchybar-app-font-bg (required for custom app icons)
+echo -e "${BLUE}:: sketchybar-app-font-bg kuruluyor...${NC}"
+SKETCHYBAR_APP_FONT_BG_DIR="$HOME/.config/sketchybar/helpers/sketchybar-app-font-bg"
+if [ ! -d "$SKETCHYBAR_APP_FONT_BG_DIR" ]; then
+    mkdir -p "$HOME/.config/sketchybar/helpers"
+    git clone https://github.com/SoichiroYamane/sketchybar-app-font-bg.git "$SKETCHYBAR_APP_FONT_BG_DIR"
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}:: sketchybar-app-font-bg başarıyla klonlandı.${NC}"
+        # Follow the installation instructions from the repo
+        cd "$SKETCHYBAR_APP_FONT_BG_DIR"
+        # Check if there's an install script or readme
+        if [ -f "install.sh" ]; then
+            bash install.sh
+        elif [ -f "Makefile" ]; then
+            make install
         fi
         cd - > /dev/null
-        rm -rf /tmp/SbarLua
     else
-        echo -e "${GREEN}:: SbarLua zaten yüklü.${NC}"
+        echo -e "${RED}:: sketchybar-app-font-bg klonlanamadı.${NC}"
     fi
+else
+    echo -e "${GREEN}:: sketchybar-app-font-bg zaten yüklü.${NC}"
+fi
+
+# Install SbarLua
+echo -e "${BLUE}:: SbarLua kuruluyor...${NC}"
+if [ ! -d "/usr/local/share/lua/5.4/sketchybar" ]; then
+    git clone https://github.com/FelixKratz/SbarLua.git /tmp/SbarLua
+    cd /tmp/SbarLua
+    make install
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}:: SbarLua başarıyla kuruldu.${NC}"
+    else
+        echo -e "${RED}:: SbarLua kurulumu başarısız.${NC}"
+    fi
+    cd - > /dev/null
+    rm -rf /tmp/SbarLua
+else
+    echo -e "${GREEN}:: SbarLua zaten yüklü.${NC}"
 fi
 
 # --------------------------------------------------------------
@@ -275,36 +307,57 @@ fi
 
 # Build sketchybar helper binaries if configuration exists
 SKETCHYBAR_CONFIG_DIR="$HOME/.config/sketchybar"
-if [ -d "$SKETCHYBAR_CONFIG_DIR" ]; then
+if [ -d "$SKETCHYBAR_CONFIG_DIR/helpers" ]; then
     echo -e "${BLUE}:: Sketchybar helper binary'leri derleniyor...${NC}"
+    
+    # Save current directory
+    CURRENT_DIR=$(pwd)
+    
+    # Build helpers
     cd "$SKETCHYBAR_CONFIG_DIR/helpers"
-    make
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}:: Sketchybar helper binary'leri başarıyla derlendi.${NC}"
+    if [ -f "Makefile" ]; then
+        make clean 2>/dev/null
+        make
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}:: Sketchybar helper binary'leri başarıyla derlendi.${NC}"
+        else
+            echo -e "${RED}:: Sketchybar helper binary'leri derlenemedi.${NC}"
+        fi
     else
-        echo -e "${RED}:: Sketchybar helper binary'leri derlenemedi.${NC}"
+        echo -e "${YELLOW}:: Makefile bulunamadı, helper binary'leri derlenemedi.${NC}"
     fi
-
+    
+    # Make all binaries executable
+    if [ -d "bin" ]; then
+        chmod +x bin/*
+        echo -e "${GREEN}:: Helper binary'leri çalıştırılabilir yapıldı.${NC}"
+    fi
+    
+    # Return to original directory
+    cd "$CURRENT_DIR"
+    
     # Start sketchybar service
     echo -e "${BLUE}:: Sketchybar servisi başlatılıyor...${NC}"
-    brew services start sketchybar
+    brew services restart sketchybar
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}:: Sketchybar servisi başarıyla başlatıldı.${NC}"
     else
         echo -e "${RED}:: Sketchybar servisi başlatılamadı.${NC}"
+        echo -e "${YELLOW}:: Logları kontrol etmek için: log stream --predicate 'process == \"sketchybar\"' --level info${NC}"
     fi
 else
-    echo -e "${YELLOW}:: Sketchybar konfigürasyonu bulunamadı, helper binary'leri derlenemedi.${NC}"
+    echo -e "${YELLOW}:: Sketchybar konfigürasyonu bulunamadı: $SKETCHYBAR_CONFIG_DIR/helpers${NC}"
+    echo -e "${YELLOW}:: Dotfiles'ın doğru şekilde stow edildiğinden emin olun.${NC}"
 fi
 
+# --------------------------------------------------------------
+# Git Configuration
+# --------------------------------------------------------------
 
 git config --global user.name "emirbartu"
 git config --global user.email "bartuekinci42@gmail.com"
 
-if [ -f "$DEST_DOTFILES_DIR/zshrc/.zshrc" ]; then
-    echo ":: Installing custom .zshrc..."
-    cp -f "$DEST_DOTFILES_DIR/zshrc/.zshrc" "$HOME/.zshrc"
-fi
+echo ":: Configuration complete! Please run 'source ~/.zshrc' or restart your terminal."
 
 # --------------------------------------------------------------
 # Finish
