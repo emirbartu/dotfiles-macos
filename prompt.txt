@@ -1,0 +1,13 @@
+Project Path: dotfiles-macos
+
+Source Tree:
+
+```txt
+dotfiles-macos
+└── dotfiles
+    ├── assets
+    │   ├── Tx6U0wFr.png
+    │   └── ign_waifu.png
+    └── homebrew
+
+```

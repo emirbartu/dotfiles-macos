@@ -39,9 +39,7 @@ plugins=(
 
 # Set-up oh-my-zsh and zsh-autocomplete
 source $ZSH/oh-my-zsh.sh
-source /usr/share/zsh/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh
-
-# -----------------------------------------------------
+source $HOME/.oh-my-zsh/custom/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh 
 # Set-up FZF key bindings (CTRL R for fuzzy history finder)
 # -----------------------------------------------------
 source <(fzf --zsh)
